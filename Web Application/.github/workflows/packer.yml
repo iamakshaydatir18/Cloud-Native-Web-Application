@@ -1,0 +1,226 @@
+name: Packer Workflow
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    name: packer workflow
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.DB_NAME }}
+          MYSQL_USER: ${{ secrets.DB_USER }}
+          MYSQL_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+          
+    steps:
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Set up JDK 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'adopt'
+          java-version: '17'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Set environment variables for Spring Boot
+        run: |
+          echo "SERVER_PORT=${{ secrets.SERVER_PORT }}" >> $GITHUB_ENV
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> $GITHUB_ENV
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> $GITHUB_ENV
+          echo "DB_USER=${{ secrets.DB_USER }}" >> $GITHUB_ENV
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> $GITHUB_ENV
+          echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
+
+      - name: Build and test with Maven
+        run: mvn clean install
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          AWS_REGION : ${{ secrets.AWS_REGION }}
+
+      # Run integration tests
+      - name: Run integration tests
+        run: mvn verify
+
+      # Build the application artifact
+      - name: Build application artifact
+        run: mvn clean package
+
+     # Upload ROOT.jar file artifact
+      - name: Build Maven JAR
+        run: |
+             mvn clean package 
+             pwd
+             rm -rf imgbuild
+             mkdir imgbuild && cp target/webapp-0.0.1-SNAPSHOT.jar imgbuild  
+             cp imgbuild/webapp-0.0.1-SNAPSHOT.jar /home/runner/work/webapp/webapp/ROOT.jar
+             cd /home/runner/work/webapp/webapp && ls -all
+             cd /home/runner/work/webapp/webapp/imgbuild && ls -all
+             cd /home/runner/work/webapp/webapp/target && ls -all
+          
+       # Configure AWS credentials based on environment
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Setup Packer
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: '1.9.0'
+
+      # Build the AMI with Packer
+      - name: Build AMI with Packer
+        run: |
+          pwd
+          ls -la
+          packer init ./packer/
+          packer validate -var-file=./packer/variables.pkrvars.hcl ./packer/
+          packer build -var-file=./packer/variables.pkrvars.hcl ./packer/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          PKR_VAR_REGION: ${{ secrets.AWS_REGION }}
+          PKR_VAR_MYSQL_USER: ${{ secrets.DB_USER }}
+          PKR_VAR_MYSQL_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          PKR_VAR_MYSQL_DATABASE: ${{ secrets.DB_NAME }}
+          
+          
+      - name: Get latest AMI ID and verify
+        id: get-ami
+        run: | # Get the latest AMI ID
+           AMI_ID=$(aws ec2 describe-images --owners self --filters "Name=name,Values=webapp-*" --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+           echo "Latest AMI ID: $AMI_ID"
+           # Get creation date of the latest AMI
+           CREATION_DATE=$(aws ec2 describe-images --image-ids $AMI_ID --query 'Images[0].CreationDate' --output text)
+           echo "Creation date of latest AMI: $CREATION_DATE"
+    
+           # List all AMIs sorted by creation date (newest first)
+            echo "All AMIs sorted by creation date (newest first):"
+            aws ec2 describe-images --owners self --filters "Name=name,Values=webapp-*" --query 'sort_by(Images, &CreationDate)[].{ID:ImageId,Name:Name,CreationDate:CreationDate}' --output table
+    
+           # Verify if the selected AMI is the newest
+           NEWEST_AMI=$(aws ec2 describe-images --owners self --filters "Name=name,Values=webapp-*" --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+           if [ "$AMI_ID" = "$NEWEST_AMI" ]; then
+            echo "Verification successful: Selected AMI is the newest."
+           else
+            echo "Verification failed: Selected AMI is not the newest."
+            echo "Selected AMI: $AMI_ID"
+            echo "Newest AMI: $NEWEST_AMI"
+            exit 1
+           fi
+    
+           echo "ami_id=$AMI_ID" >> $GITHUB_OUTPUT
+           
+      - name: Retrieve AMI ID For sharing to DEMO ACCOUNT
+        id: get-ami-id
+        run: |
+          # Retrieve the most recent AMI that matches the name format "webapp-YYYY_MM_DD-HHMMSS"
+          AMI_ID=$(aws ec2 describe-images --owners self --filters 'Name=name,Values=webapp-*' --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+    
+          # Check if AMI_ID is valid
+          if [ "$AMI_ID" == "None" ]; then
+           echo "Error: No AMI found matching the name pattern."
+          exit 1
+          fi
+    
+          echo "AMI_ID=$AMI_ID"
+          echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
+
+      - name: Share AMI with DEMO Account
+        run: |
+          # Share the retrieved AMI with the DEMO account using its AWS account ID
+          aws ec2 modify-image-attribute --image-id ${{ env.AMI_ID }} --launch-permission "{\"Add\":[{\"UserId\":\"${{ secrets.DEMO_ACCOUNT_ID }}\"}]}"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.ENVIRONMENT == 'dev' && secrets.DEV_AWS_ACCESS_KEY_ID || secrets.DEMO_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ENVIRONMENT == 'dev' && secrets.DEV_AWS_SECRET_ACCESS_KEY || secrets.DEMO_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}      
+      
+      # Create new Launch Template version
+      - name: Create new Launch Template version
+        run: |
+          LAUNCH_TEMPLATE_NAME=${{ secrets.LAUNCH_TEMPLATE_NAME }}
+          aws ec2 create-launch-template-version \
+            --launch-template-name $LAUNCH_TEMPLATE_NAME \
+            --version-description "New version with latest AMI" \
+            --source-version '$Latest' \
+            --launch-template-data '{"ImageId":"${{ steps.get-ami.outputs.ami_id }}"}'
+
+      # Update Auto Scaling group
+      - name: Update Auto Scaling group
+        run: |
+          ASG_NAME=${{ secrets.AUTO_SCALING_GROUP_NAME }}
+          LAUNCH_TEMPLATE_NAME=${{ secrets.LAUNCH_TEMPLATE_NAME }}
+          aws autoscaling update-auto-scaling-group \
+            --auto-scaling-group-name $ASG_NAME \
+            --launch-template LaunchTemplateName=$LAUNCH_TEMPLATE_NAME,Version='$Latest'
+
+      # Start instance refresh
+      - name: Start instance refresh
+        id: start-refresh
+        run: |
+          ASG_NAME=${{ secrets.AUTO_SCALING_GROUP_NAME }}
+          REFRESH_ID=$(aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name $ASG_NAME \
+            --strategy Rolling \
+            --preferences '{"MinHealthyPercentage": 90, "InstanceWarmup": 300}' \
+            --query 'InstanceRefreshId' --output text)
+          echo "refresh_id=$REFRESH_ID" >> $GITHUB_OUTPUT
+
+      # Wait for instance refresh to complete
+      - name: Wait for instance refresh to complete
+        run: |
+          ASG_NAME=${{ secrets.AUTO_SCALING_GROUP_NAME }}
+          while true; do
+            STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name $ASG_NAME \
+              --instance-refresh-ids ${{ steps.start-refresh.outputs.refresh_id }} \
+              --query 'InstanceRefreshes[0].Status' --output text)
+            if [ "$STATUS" = "Successful" ]; then
+              echo "Instance refresh completed successfully"
+              exit 0
+            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ]; then
+              echo "Instance refresh failed or was cancelled"
+              exit 1
+            else
+              echo "Instance refresh status: $STATUS"
+              sleep 60
+            fi
+          done
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+          

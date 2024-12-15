@@ -1,0 +1,7 @@
+region          = "us-east-1"
+csye6225        = "csye6225"
+source_ami      = "ami-0866a3c8686eaeeba"
+ssh_username    = "ubuntu"
+default_vpc     = "vpc-0e06ce7885948521d"
+default_subnet  = "subnet-01e77c7afba305323"
+demo_account_id = "248189912281"

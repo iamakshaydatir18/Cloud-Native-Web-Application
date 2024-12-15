@@ -1,0 +1,204 @@
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude all .tfvars files, which are likely to contain sensitive data, such as
+# password, private keys, and other secrets. These should not be part of version 
+# control as they are data points which are potentially sensitive and subject 
+# to change depending on the environment.
+*.tfvars
+*.tfvars.json
+
+# Ignore override files as they are usually used to override resources locally and so
+# are not checked in
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore transient lock info files created by terraform apply
+.terraform.tfstate.lock.info
+
+# Include override files you do wish to add to version control using negated pattern
+# !example_override.tf
+
+# Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
+# example: *tfplan*
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+
+# Build directories
+target/
+build/
+bin/
+
+/target/
+
+# Eclipse specific files
+.classpath
+.project
+.settings/
+
+# IntelliJ IDEA specific files
+.idea/
+*.iml
+*.iws
+
+# VSCode specific files
+.vscode/
+
+# Logs
+*.log
+spring.log
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Compiled class files
+*.class
+
+# Package files
+*.jar
+*.war
+*.ear
+
+# Sensitive configuration files (should be added to .gitignore)
+application.yml
+
+# If you provide template/sample config files, keep them:
+# Uncomment these lines if you include sample files for configuration
+# application.yml.example
+
+
+# Database files (if using local databases such as H2 or SQLite)
+*.h2.db
+*.mv.db
+*.db
+*.lock.db
+
+# Docker related files (optional, if you're using Docker)
+docker-compose.yml
+Dockerfile
+
+# Node dependencies (if using npm or yarn for frontend or other tools)
+node_modules/
+
+# Temporary files
+*.swp
+*.tmp
+*.bak
+*.swo
+*~.nib
+*.orig
+
+# Test outputs and reports
+test-output/
+surefire-reports/
+
+
+# Ignore IDE workspace, project, and build management tools' settings
+.idea/
+*.iml
+.gradle/
+.project
+.settings/
+.classpath
+
+# Sensitive configuration files (should be added to .gitignore)
+application.yml
+.env
+
+
+
+# Build directories
+target/
+build/
+bin/
+
+/target/
+
+# Eclipse specific files
+.classpath
+.project
+.settings/
+
+# IntelliJ IDEA specific files
+.idea/
+*.iml
+*.iws
+
+# VSCode specific files
+.vscode/
+
+# Logs
+*.log
+spring.log
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Compiled class files
+*.class
+
+# Package files
+*.jar
+*.war
+*.ear
+
+# Sensitive configuration files (should be added to .gitignore)
+application.yml
+
+# If you provide template/sample config files, keep them:
+# Uncomment these lines if you include sample files for configuration
+# application.yml.example
+
+
+# Database files (if using local databases such as H2 or SQLite)
+*.h2.db
+*.mv.db
+*.db
+*.lock.db
+
+# Docker related files (optional, if you're using Docker)
+docker-compose.yml
+Dockerfile
+
+# Node dependencies (if using npm or yarn for frontend or other tools)
+node_modules/
+
+# Temporary files
+*.swp
+*.tmp
+*.bak
+*.swo
+*~.nib
+*.orig
+
+# Test outputs and reports
+test-output/
+surefire-reports/
+
+
+# Ignore IDE workspace, project, and build management tools' settings
+.idea/
+*.iml
+.gradle/
+.project
+.settings/
+.classpath
+
+# Sensitive configuration files (should be added to .gitignore)
+application.yml
+.env

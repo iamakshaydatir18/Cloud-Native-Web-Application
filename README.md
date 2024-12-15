@@ -69,3 +69,6 @@ The application uses a multi-stage deployment process:
 - Terraform installed
 - Java/Spring Boot environment
 - AWS CLI configured
+
+
+<img src="image.png" alt="Alt text" style="max-width: 300px;">

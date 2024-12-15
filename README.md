@@ -71,4 +71,5 @@ The application uses a multi-stage deployment process:
 - AWS CLI configured
 
 
+## Cloud Architecture
 <img src="image.png" alt="Alt text" style="max-width: 300px;">
